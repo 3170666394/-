@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        #box {
+            width: 100%;
+            height: 300px;
+            overflow: hidden;
+            position: relative;
+            background: #f0f0f0;
+            cursor: e-resize;
+        }
+
+        ul,
+        li {
+            list-style: none;
+        }
+
+        ul {
+            width: 4500px;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        li {
+            width: 280px;
+            height: 100%;
+            float: left;
+            margin: 0 10px;
+            height: 300px;
+            /* background: #f23; */
+            border: 2px solid #f23;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+
+        #bottom {
+            width: 900px;
+            height: 20px;
+            background: #ccc;
+            margin: 50px auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #btm-red {
+            position: absolute;
+            width: 100px;
+            cursor: e-resize;
+            height: 100%;
+            left: 0;
+            top: 0;
+            background: #f23;
+        }
+    </style>
+</head>
+
+<body>
+    <p>
+        使用说明：拖拽<br>
+        当我
+        <span class="shuzi"></span>
+    </p>
+    <div id="box">
+        <ul style="left: 600px;">
+            <li>1</li>
+            <li>2</li>
+            <li>3</li>
+            <li>4</li>
+            <li>5</li>
+            <li>6</li>
+            <li>7</li>
+            <li>8</li>
+            <li>9</li>
+            <li>10</li>
+            <li>11</li>
+            <li>12</li>
+            <li>13</li>
+            <li>14</li>
+            <li>15</li>
+        </ul>
+    </div>
+    <div id="bottom">
+        <div id="btm-red" class="scroll" style="left: 0;"></div>
+    </div>
+</body>
+<script src="./drag.js"></script>
+<script>
+    //获取元素
+    let box = document.getElementById('box');
+    let ul = document.getElementsByTagName('ul')[0];
+    let btm = document.getElementById('btm-red');
+    let btt = document.getElementById('bottom');
+    let span = document.getElementsByClassName('shuzi')[0];
+
+    // 初始化我的布局样式
+    let ready = new AllMove(300, 15, 600, ul, 100, 900);
+    // 建立主体
+    let subject = new Subject();
+
+    //  建立观察者
+    let btm_obser = new Observer(btm, subject);
+    let span_obser = new Observer(span, subject);
+
+    // 更新时发生的变化
+    btm_obser.update = function () {
+        //获取滚动条的横坐标值
+        let info = ready.scrollBottom(this.subject.state);
+        this.dom.style.left = info + 'px';
+    }
+    span_obser.update = function () {
+        //获取内容的index值
+        let info = ready.judgeIndex(this.subject.state);
+        span.innerHTML = Math.floor(info);
+    }
+
+    // 内容脱拽
+    box.onmousedown = function (e) {
+        let env = e || window.event;
+        // 获取按下那刻的时间
+        let new_time = new Date();
+        // 清空可拖拽的动画时间
+        ul.style.transition = '0s';
+        btm.style.transition = '0s';
+        // 获取鼠标横坐标
+        let offset = env.clientX;
+        //当前内容位置
+        let bLeft = parseInt(ul.style.left);
+        let num = null;
+        // 阻止浏览器默认行为
+        stopBow(env);
+        //鼠标移动
+        document.onmousemove = function (e) {
+            let evn = e || window.event;
+            //移动时的鼠标横坐标
+            let client = evn.clientX;
+            //开始与结束之间的距离
+            num = offset - client;
+            //内容的横坐标
+            let distance = bLeft - num;
+            //超出边界时的状态
+            distance = ready.checkDrag(distance);
+
+            ul.style.left = distance + 'px';
+
+            // 将此时坐标发给主体，更新信息
+            //观察者状态更新
+            subject.setState(distance)
+        }
+        // 鼠标抬起
+        document.onmouseup = function () {
+            // 清空移动事件
+            document.onmousemove = null;
+            // 获取抬起瞬间的时间
+            let old_time = new Date();
+            // 设置动画时间，看起来更舒适
+            ul.style.transition = '0.4s';
+            btm.style.transition = '0.4s';
+            // 获取当前内容横坐标
+            let fanl = parseInt(ul.style.left);
+            //使用方法 ，判定鼠标快速滚动 进行换块
+            fanl = fanl - handMove(new_time, old_time, num);
+            //判断当前位置是否为规定位置，若不是，回到指定位置
+            let info = ready.checkfanl(fanl);
+            // 将此时坐标发给主体，更新信息
+            //观察者状态更新
+            subject.setState(info)
+        }
+    }
+
+
+    btt.onmousedown = function (e) {
+        // 设置动画时间，看起来更舒适
+        ul.style.transition = '0.4s';
+        btm.style.transition = '0.4s';
+        let env = e || window.event;
+        // 滚动块坐标
+        let off = env.offsetX - 50;
+        // 由滚动块坐标变为内容坐标
+        let info = ready.convers(off);
+        // 将此时坐标发给主体，更新信息
+        //观察者状态更新
+        subject.setState(info)
+    }
+
+    btm.onmousedown = function (e) {
+        // 清空滚动条动画时间，防止拖动困难
+        btm.style.transition = '0s';
+        let env = e || window.event;
+        // 阻止冒泡，防止影响btt的鼠标按下事件
+        stopMao(env);
+
+        let off = env.clientX;
+        let Dleft = parseInt(btm.style.left);
+        let num = null;
+        let info = null;
+
+        document.onmousemove = function (e) {
+            let evn = e || window.event;
+            let clien = evn.clientX;
+            //开始与结束之间的距离
+            num = off - clien;
+            //滚动块的横坐标
+            let distance = Dleft - num;
+            // 由滚动块坐标变为内容坐标
+            info = ready.convers(distance);
+            //这里必须手动给btm赋个坐标
+            btm.style.left = distance + 'px';
+        }
+        document.onmouseup = function () {
+            document.onmousemove = null;
+            // 将此时坐标发给主体，更新信息
+            //观察者状态更新
+            subject.setState(info)
+        }
+    }
+</script>
+
+
+</html>
